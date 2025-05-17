@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -45,7 +46,10 @@ class _LoginPageState extends State<LoginPage> {
         }
 
         final credential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
-        await FirebaseFirestore.instance.collection('users').doc(credential.user?.uid).set({'isAdmin': false});
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(credential.user?.uid)
+            .set({'isAdmin': false});
         _showSnackBar('Account created. Please login.');
         setState(() => _isLogin = true);
       }
@@ -65,7 +69,14 @@ class _LoginPageState extends State<LoginPage> {
     final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
     final isAdmin = doc.data()?['isAdmin'] == true;
 
-    Navigator.pushReplacementNamed(context, isAdmin ? '/adminDashboard' : '/userDashboard');
+    final prefs = await SharedPreferences.getInstance();
+    final seenOnboard = prefs.getBool('seenOnboard') ?? false;
+
+    if (!seenOnboard) {
+      Navigator.pushReplacementNamed(context, '/onboarding');
+    } else {
+      Navigator.pushReplacementNamed(context, isAdmin ? '/adminDashboard' : '/userDashboard');
+    }
   }
 
   Future<void> _signInWithGoogle() async {
@@ -79,12 +90,18 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(idToken: googleAuth.idToken, accessToken: googleAuth.accessToken);
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+        accessToken: googleAuth.accessToken,
+      );
       final userCred = await _auth.signInWithCredential(credential);
 
       final doc = await FirebaseFirestore.instance.collection('users').doc(userCred.user?.uid).get();
       if (!doc.exists) {
-        await FirebaseFirestore.instance.collection('users').doc(userCred.user?.uid).set({'isAdmin': false});
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCred.user?.uid)
+            .set({'isAdmin': false});
       }
 
       await _postLogin(userCred.user);
@@ -121,14 +138,16 @@ class _LoginPageState extends State<LoginPage> {
                   TextFormField(
                     controller: emailController,
                     decoration: const InputDecoration(labelText: 'Email'),
-                    validator: (value) => (value == null || !value.contains('@')) ? 'Enter valid email' : null,
+                    validator: (value) =>
+                    (value == null || !value.contains('@')) ? 'Enter valid email' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: passwordController,
                     decoration: const InputDecoration(labelText: 'Password'),
                     obscureText: true,
-                    validator: (value) => (value == null || value.length < 6) ? 'Minimum 6 characters' : null,
+                    validator: (value) =>
+                    (value == null || value.length < 6) ? 'Minimum 6 characters' : null,
                   ),
                   if (!_isLogin)
                     Padding(
@@ -137,7 +156,8 @@ class _LoginPageState extends State<LoginPage> {
                         controller: confirmPasswordController,
                         decoration: const InputDecoration(labelText: 'Confirm Password'),
                         obscureText: true,
-                        validator: (value) => (value == null || value.length < 6) ? 'Confirm your password' : null,
+                        validator: (value) =>
+                        (value == null || value.length < 6) ? 'Confirm your password' : null,
                       ),
                     ),
                   const SizedBox(height: 20),
