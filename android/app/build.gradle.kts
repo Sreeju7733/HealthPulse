@@ -1,8 +1,17 @@
+dependencies {
+    implementation 'com.google.firebase:firebase-auth:22.1.1' // latest version
+    implementation 'com.google.android.gms:play-services-auth:20.7.0' // required for Google Sign-In
+    implementation(platform("com.google.firebase:firebase-bom:33.13.0"))
+    implementation("com.google.firebase:firebase-analytics")
+}
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    apply plugin: 'com.google.gms.google-services'
+
 }
 
 android {
@@ -24,7 +33,7 @@ android {
         applicationId = "com.example.healthpulse"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 21
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
