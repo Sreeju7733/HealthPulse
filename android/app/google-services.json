@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "583337509230",
+    "project_id": "healthpulse-b54f5",
+    "storage_bucket": "healthpulse-b54f5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:583337509230:android:24dd83138a89d8ee7a417f",
+        "android_client_info": {
+          "package_name": "com.example.healthpulse"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnzmI5H1lQWNvULCOa-MFFf0ogzyjS3MI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:583337509230:android:1c35ac1d5e61f35e7a417f",
+        "android_client_info": {
+          "package_name": "com.healthpulse.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnzmI5H1lQWNvULCOa-MFFf0ogzyjS3MI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:583337509230:android:ece9d79ff738e1347a417f",
+        "android_client_info": {
+          "package_name": "org.healthpulse.ai.healthpulse_ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnzmI5H1lQWNvULCOa-MFFf0ogzyjS3MI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
