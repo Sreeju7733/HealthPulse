@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'chat_service.dart';
+import 'chat_service.dart'; // Make sure this file is in your project
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -9,12 +9,22 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final chatService = ChatService();
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, String>> messages = [];
 
   bool isLoading = false;
+
+  // Replace with your deployed Firebase Cloud Function URL
+  final String cloudFunctionUrl = 'https://us-central1-your-project-id.cloudfunctions.net/healthChat';
+
+  late ChatService chatService;
+
+  @override
+  void initState() {
+    super.initState();
+    chatService = ChatService(cloudFunctionUrl: cloudFunctionUrl);
+  }
 
   void _sendMessage() async {
     final userInput = _controller.text.trim();
@@ -26,20 +36,28 @@ class _ChatScreenState extends State<ChatScreen> {
       _controller.clear();
     });
 
-    final reply = await chatService.sendMessage(userInput);
+    try {
+      // Send all messages (user + assistant) to your Cloud Function
+      final reply = await chatService.sendMessage(messages);
 
-    setState(() {
-      messages.add({'role': 'bot', 'text': reply});
-      isLoading = false;
-    });
+      setState(() {
+        messages.add({'role': 'assistant', 'text': reply});
+        isLoading = false;
+      });
 
-    // Auto-scroll to bottom
-    await Future.delayed(const Duration(milliseconds: 300));
-    _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent + 100,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
-    );
+      // Scroll down after response
+      await Future.delayed(const Duration(milliseconds: 300));
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent + 100,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        messages.add({'role': 'assistant', 'text': 'Error: ${e.toString()}'});
+      });
+    }
   }
 
   Widget _buildMessage(Map<String, String> message) {
@@ -85,9 +103,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    decoration:
-                    const InputDecoration(hintText: 'Type your message...'),
+                    decoration: const InputDecoration(hintText: 'Type your message...'),
                     onSubmitted: (_) => _sendMessage(),
+                    enabled: !isLoading,
                   ),
                 ),
                 IconButton(

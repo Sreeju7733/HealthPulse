@@ -9,98 +9,6 @@ import 'login_page.dart';
 import 'onboarding_screen.dart';
 import 'dashboard_page.dart';
 import 'admin_dashboard.dart';
-import 'chat_service.dart';
-
-// Add ChatScreen here directly
-class ChatScreen extends StatefulWidget {
-  const ChatScreen({Key? key}) : super(key: key);
-
-  @override
-  State<ChatScreen> createState() => _ChatScreenState();
-}
-
-class _ChatScreenState extends State<ChatScreen> {
-  final chatService = ChatService();
-  final TextEditingController _controller = TextEditingController();
-  final List<Map<String, String>> messages = [];
-
-  bool isLoading = false;
-
-  void _sendMessage() async {
-    final userInput = _controller.text.trim();
-    if (userInput.isEmpty) return;
-
-    setState(() {
-      isLoading = true;
-      messages.add({'role': 'user', 'text': userInput});
-      _controller.clear();
-    });
-
-    final reply = await chatService.sendMessage(userInput);
-
-    setState(() {
-      messages.add({'role': 'bot', 'text': reply});
-      isLoading = false;
-    });
-  }
-
-  Widget _buildMessage(Map<String, String> message) {
-    final isUser = message['role'] == 'user';
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        decoration: BoxDecoration(
-          color: isUser ? Colors.blue[100] : Colors.grey[300],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(message['text'] ?? ''),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Healthpulse AI')),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: messages.length,
-              itemBuilder: (_, index) => _buildMessage(messages[index]),
-            ),
-          ),
-          if (isLoading)
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: CircularProgressIndicator(),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration:
-                    const InputDecoration(hintText: 'Type your message...'),
-                    onSubmitted: (_) => _sendMessage(),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -110,7 +18,6 @@ void main() async {
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
-
   @override
   State<MyApp> createState() => _MyAppState();
 }
@@ -142,8 +49,7 @@ class _MyAppState extends State<MyApp> {
           _seenOnboard = prefs.getBool('seenOnboard') ?? false;
           _loading = false;
         });
-      } catch (e) {
-        print("Error checking user role: $e");
+      } catch (_) {
         setState(() {
           _loading = false;
         });
@@ -160,14 +66,11 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const MaterialApp(
-        home: Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        ),
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
 
     Widget homeWidget;
-
     if (!_isLoggedIn) {
       homeWidget = const LoginPage();
     } else if (!_seenOnboard) {
@@ -184,12 +87,145 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(primarySwatch: Colors.deepPurple),
       home: homeWidget,
       routes: {
-        '/login': (context) => const LoginPage(),
-        '/onboarding': (context) => const OnboardingScreen(),
-        '/dashboard': (context) => const DashboardPage(),
-        '/adminDashboard': (context) => const AdminDashboard(),
-        '/chat': (context) => const ChatScreen(),
+        '/login': (_) => const LoginPage(),
+        '/onboarding': (_) => const OnboardingScreen(),
+        '/dashboard': (_) => const DashboardPage(),
+        '/adminDashboard': (_) => const AdminDashboard(),
+        '/chat': (_) => const ChatScreen(),
       },
+    );
+  }
+}
+
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({super.key});
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  final TextEditingController _controller = TextEditingController();
+  final List<Map<String, String>> conversation = [];
+
+  String? currentBotMessage = "Hello! I’m your health assistant. How can I help you today?";
+  bool isLoading = false;
+  bool chatComplete = false;
+
+  Future<String> sendToGeminiAI(List<Map<String, String>> conversation) async {
+    await Future.delayed(const Duration(seconds: 2));
+
+    final lastUserInput = conversation.isNotEmpty ? conversation.last['user'] ?? '' : '';
+
+    // Replace this with your actual Gemini API integration
+    if (conversation.length > 5 || lastUserInput.toLowerCase().contains("no") || lastUserInput.toLowerCase().contains("that's all")) {
+      return "Thank you. Based on your responses, you should consult a doctor if symptoms persist. Stay hydrated and rest.";
+    }
+
+    return "Can you tell me more about your symptoms or how you're feeling?";
+  }
+
+  Future<void> _handleSubmit() async {
+    final userInput = _controller.text.trim();
+    if (userInput.isEmpty || isLoading || chatComplete) return;
+
+    setState(() {
+      conversation.add({'user': userInput, 'bot': currentBotMessage!});
+      _controller.clear();
+      isLoading = true;
+    });
+
+    try {
+      final botReply = await sendToGeminiAI(conversation);
+      setState(() {
+        currentBotMessage = botReply;
+        isLoading = false;
+      });
+
+      if (botReply.toLowerCase().contains("thank you") || botReply.toLowerCase().contains("consult a doctor")) {
+        setState(() {
+          chatComplete = true;
+        });
+
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await FirebaseFirestore.instance
+              .collection('user_chats')
+              .doc(user.uid)
+              .collection('sessions')
+              .add({
+            'conversation': conversation,
+            'final_advice': botReply,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    } catch (e) {
+      setState(() {
+        currentBotMessage = "Error getting AI response: $e";
+        isLoading = false;
+        chatComplete = true;
+      });
+    }
+  }
+
+  Widget _buildChat() {
+    List<Widget> widgets = [];
+    for (var qa in conversation) {
+      widgets.add(_buildBubble(qa['bot']!, isBot: true));
+      widgets.add(_buildBubble(qa['user']!, isBot: false));
+    }
+    if (!chatComplete && currentBotMessage != null) {
+      widgets.add(_buildBubble(currentBotMessage!, isBot: true));
+    }
+    return ListView(padding: const EdgeInsets.all(8), children: widgets);
+  }
+
+  Widget _buildBubble(String text, {required bool isBot}) {
+    return Align(
+      alignment: isBot ? Alignment.centerLeft : Alignment.centerRight,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isBot ? Colors.grey[300] : Colors.blue[100],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(text),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Healthpulse AI')),
+      body: Column(
+        children: [
+          Expanded(child: _buildChat()),
+          if (isLoading) const Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()),
+          if (!chatComplete && !isLoading)
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      decoration: const InputDecoration(hintText: "Type your response..."),
+                      onSubmitted: (_) => _handleSubmit(),
+                    ),
+                  ),
+                  IconButton(icon: const Icon(Icons.send), onPressed: _handleSubmit),
+                ],
+              ),
+            ),
+          if (chatComplete)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text("Thank you! Your session is complete.", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+        ],
+      ),
     );
   }
 }
