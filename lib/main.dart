@@ -9,6 +9,7 @@ import 'login_page.dart';
 import 'onboarding_screen.dart';
 import 'dashboard_page.dart';
 import 'admin_dashboard.dart';
+import 'chat_service.dart'; // ✅ Chat service
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -105,23 +106,20 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
+
+  // conversation list holds each message as a map: {'question': userText, 'answer': botText}
   final List<Map<String, String>> conversation = [];
 
-  String? currentBotMessage = "Hello! I’m your health assistant. How can I help you today?";
+  final ChatService chatService = ChatService();
+  String currentBotMessage = "Hello! I’m your health assistant. How can I help you today?";
   bool isLoading = false;
   bool chatComplete = false;
 
-  Future<String> sendToGeminiAI(List<Map<String, String>> conversation) async {
-    await Future.delayed(const Duration(seconds: 2));
-
-    final lastUserInput = conversation.isNotEmpty ? conversation.last['user'] ?? '' : '';
-
-    // Replace this with your actual Gemini API integration
-    if (conversation.length > 5 || lastUserInput.toLowerCase().contains("no") || lastUserInput.toLowerCase().contains("that's all")) {
-      return "Thank you. Based on your responses, you should consult a doctor if symptoms persist. Stay hydrated and rest.";
-    }
-
-    return "Can you tell me more about your symptoms or how you're feeling?";
+  @override
+  void initState() {
+    super.initState();
+    // Initialize conversation with the first bot message only (no user question yet)
+    conversation.add({'answer': currentBotMessage});
   }
 
   Future<void> _handleSubmit() async {
@@ -129,24 +127,34 @@ class _ChatScreenState extends State<ChatScreen> {
     if (userInput.isEmpty || isLoading || chatComplete) return;
 
     setState(() {
-      conversation.add({'user': userInput, 'bot': currentBotMessage!});
+      // Add the user's question as a new entry (without answer yet)
+      conversation.add({'question': userInput});
       _controller.clear();
       isLoading = true;
     });
 
+    final user = FirebaseAuth.instance.currentUser;
+    final userId = user?.uid ?? 'guestUser';
+
     try {
-      final botReply = await sendToGeminiAI(conversation);
+      // Send the full conversation to chatService for context
+      final botReply = await chatService.sendMessage(userInput, userId);
+
+
       setState(() {
+        // Update the last conversation entry with the bot's answer
+        conversation[conversation.length - 1]['answer'] = botReply;
         currentBotMessage = botReply;
         isLoading = false;
       });
 
-      if (botReply.toLowerCase().contains("thank you") || botReply.toLowerCase().contains("consult a doctor")) {
+      // If bot reply indicates end of chat, save session & lock input
+      if (botReply.toLowerCase().contains("thank you") ||
+          botReply.toLowerCase().contains("consult a doctor")) {
         setState(() {
           chatComplete = true;
         });
 
-        final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
           await FirebaseFirestore.instance
               .collection('user_chats')
@@ -170,13 +178,22 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildChat() {
     List<Widget> widgets = [];
-    for (var qa in conversation) {
-      widgets.add(_buildBubble(qa['bot']!, isBot: true));
-      widgets.add(_buildBubble(qa['user']!, isBot: false));
+
+    for (var entry in conversation) {
+      if (entry.containsKey('question')) {
+        widgets.add(_buildBubble(entry['question']!, isBot: false));
+      }
+      if (entry.containsKey('answer')) {
+        widgets.add(_buildBubble(entry['answer']!, isBot: true));
+      }
     }
-    if (!chatComplete && currentBotMessage != null) {
-      widgets.add(_buildBubble(currentBotMessage!, isBot: true));
+
+
+    // Show current bot message if chat not complete and no latest bot message shown yet
+    if (!chatComplete && currentBotMessage.isNotEmpty && (conversation.isEmpty || conversation.last['answer'] != currentBotMessage)) {
+      widgets.add(_buildBubble(currentBotMessage, isBot: true));
     }
+
     return ListView(padding: const EdgeInsets.all(8), children: widgets);
   }
 
@@ -202,7 +219,8 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(child: _buildChat()),
-          if (isLoading) const Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()),
+          if (isLoading)
+            const Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()),
           if (!chatComplete && !isLoading)
             Padding(
               padding: const EdgeInsets.all(8),
@@ -222,7 +240,10 @@ class _ChatScreenState extends State<ChatScreen> {
           if (chatComplete)
             const Padding(
               padding: EdgeInsets.all(12),
-              child: Text("Thank you! Your session is complete.", style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(
+                "Thank you! Your session is complete.",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
         ],
       ),

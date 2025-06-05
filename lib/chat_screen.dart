@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'chat_service.dart'; // Ensure this file is present in your project
+import 'chat_service.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -17,14 +17,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   bool isLoading = false;
 
-  final String cloudFunctionUrl = 'http://192.168.1.100:3000/healthChat'; // Use your local IP
+  final String apiUrl = 'https://7r9l50e2v2.execute-api.us-east-1.amazonaws.com/PROD/ORCAchat';
 
   late ChatService chatService;
 
   @override
   void initState() {
     super.initState();
-    chatService = ChatService(cloudFunctionUrl: cloudFunctionUrl);
+    chatService = ChatService(apiUrl: apiUrl);
   }
 
   Future<void> speak(String text) async {

@@ -2,31 +2,30 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ChatService {
-  // Replace with your Firebase Cloud Function URL after deploy
-  final String cloudFunctionUrl;
+  final String apiUrl = 'https://7r9l50e2v2.execute-api.us-east-1.amazonaws.com/PROD/ORCAchat';
 
-  ChatService({
-    required this.cloudFunctionUrl,
-  });
+  ChatService();
 
-  /// Sends chat messages to your Firebase Cloud Function which
-  /// internally calls Gemini API and returns AI's reply.
-  Future<String> sendMessage(List<Map<String, String>> messages) async {
-    final url = Uri.parse(cloudFunctionUrl);
-
+  Future<String> sendMessage(String userMessage, String userId) async {
     final headers = {'Content-Type': 'application/json'};
 
-    final body = jsonEncode({'messages': messages});
+    final body = jsonEncode({
+      "text": userMessage,  // ✅ Only user input
+      "userId": userId      // ✅ Used by Lex for session tracking
+    });
 
     try {
-      final response = await http
-          .post(url, headers: headers, body: body)
+      print('📤 Sending to Lambda: $body');
+
+      final response = await http.post(Uri.parse(apiUrl), headers: headers, body: body)
           .timeout(const Duration(seconds: 15));
+
+      print('✅ Status: ${response.statusCode}');
+      print('📥 Response: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final reply = data['reply'] ?? 'No response from AI assistant.';
-        return reply;
+        return data['message'] ?? 'No response from AI.';
       } else {
         return 'Error ${response.statusCode}: ${response.reasonPhrase}';
       }
